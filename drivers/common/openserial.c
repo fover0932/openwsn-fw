@@ -20,16 +20,13 @@
 #include "openhdlc.h"
 #include "schedule.h"
 #include "icmpv6rpl.h"
+#include "sf0.h"
 
 //=========================== variables =======================================
 
 openserial_vars_t openserial_vars;
 
 //=========================== prototypes ======================================
-
-#ifdef GOLDEN_IMAGE_SNIFFER
-extern void sniffer_setListeningChannel(uint8_t channel);
-#endif
 
 owerror_t openserial_printInfoErrorCritical(
    char             severity,
@@ -43,7 +40,7 @@ void openserial_board_reset_cb(
    opentimer_id_t id
 );
 
-void openserial_goldenImageCommands(void);
+void openserial_executeCommands(void);
 
 // HDLC output
 void outputHdlcOpen(void);
@@ -395,7 +392,7 @@ void openserial_stop() {
    
    DISABLE_INTERRUPTS();
    busyReceiving = openserial_vars.busyReceiving;
-   inputBufFill = openserial_vars.inputBufFill;
+   inputBufFill  = openserial_vars.inputBufFill;
    ENABLE_INTERRUPTS();
    
    // disable USCI_A1 TX & RX interrupt
@@ -404,9 +401,9 @@ void openserial_stop() {
    DISABLE_INTERRUPTS();
    openserial_vars.mode=MODE_OFF;
    ENABLE_INTERRUPTS();
-   //the inputBuffer has to be reset if it is not reset where the data is read.
-   //or the function openserial_getInputBuffer is called (which resets the buffer)
-   if (busyReceiving==TRUE){
+   // the inputBuffer has to be reset if it is not reset where the data is read.
+   // or the function openserial_getInputBuffer is called (which resets the buffer)
+   if (busyReceiving==TRUE) {
       openserial_printError(COMPONENT_OPENSERIAL,ERR_BUSY_RECEIVING,
                                   (errorparameter_t)0,
                                   (errorparameter_t)inputBufFill);
@@ -420,6 +417,13 @@ void openserial_stop() {
          case SERFRAME_PC2MOTE_SETROOT:
             idmanager_triggerAboutRoot();
             break;
+         case SERFRAME_PC2MOTE_RESET:
+            board_reset();
+            //reset serial buffer here just in case
+            DISABLE_INTERRUPTS();
+            openserial_vars.inputBufFill = 0;
+            ENABLE_INTERRUPTS();
+            break;
          case SERFRAME_PC2MOTE_DATA:
             openbridge_triggerData();
             break;
@@ -427,9 +431,9 @@ void openserial_stop() {
             //echo function must reset input buffer after reading the data.
             openserial_echo(&openserial_vars.inputBuf[1],inputBufFill-1);
             break;   
-         case SERFRAME_PC2MOTE_COMMAND_GD: 
+         case SERFRAME_PC2MOTE_COMMAND:
              // golden image command
-            openserial_goldenImageCommands();
+            openserial_executeCommands();
             break;
          default:
             openserial_printError(COMPONENT_OPENSERIAL,ERR_UNSUPPORTED_COMMAND,
@@ -449,13 +453,9 @@ void openserial_stop() {
    ENABLE_INTERRUPTS();
 }
 
-void openserial_goldenImageCommands(void){
+void openserial_executeCommands(void){
    uint8_t  input_buffer[10];
    uint8_t  numDataBytes;
-   uint8_t  version;
-#ifndef GOLDEN_IMAGE_NONE
-   uint8_t  type;
-#endif
    uint8_t  commandId;
    uint8_t  commandLen;
    uint8_t  comandParam_8;
@@ -471,41 +471,19 @@ void openserial_goldenImageCommands(void){
    numDataBytes = openserial_getNumDataBytes();
    //copying the buffer
    openserial_getInputBuffer(&(input_buffer[0]),numDataBytes);
-   version = openserial_vars.inputBuf[1];
-#ifndef GOLDEN_IMAGE_NONE
-   type    = openserial_vars.inputBuf[2];
-#endif
-   if (version != GOLDEN_IMAGE_VERSION) {
-      // the version of command is wrong
-      // log this info and return
-      return;
-   }
-   
-#ifdef GOLDEN_IMAGE_ROOT 
-   if ( type != GD_TYPE_ROOT ){
-       // image type is wrong
-       return;
-   }
-#endif
-#ifdef GOLDEN_IMAGE_SNIFFER
-   if (type != GD_TYPE_SNIFFER) {
-       // image type is wrong
-       return;
-   }
-#endif
-   commandId  = openserial_vars.inputBuf[3];
-   commandLen = openserial_vars.inputBuf[4];
+   commandId  = openserial_vars.inputBuf[1];
+   commandLen = openserial_vars.inputBuf[2];
    
    if (commandLen>3) {
        // the max command Len is 2, except ping commands
        return;
    } else {
        if (commandLen == 1) {
-           comandParam_8 = openserial_vars.inputBuf[5];
+           comandParam_8 = openserial_vars.inputBuf[3];
        } else {
            // commandLen == 2
-           comandParam_16 = (openserial_vars.inputBuf[5]      & 0x00ff) | \
-                            ((openserial_vars.inputBuf[6]<<8) & 0xff00); 
+           comandParam_16 = (openserial_vars.inputBuf[3]      & 0x00ff) | \
+                            ((openserial_vars.inputBuf[4]<<8) & 0xff00); 
        }
    }
    
@@ -514,14 +492,10 @@ void openserial_goldenImageCommands(void){
            sixtop_setEBPeriod(comandParam_8); // one byte, in seconds
            break;
        case COMMAND_SET_CHANNEL:
-#ifdef GOLDEN_IMAGE_ROOT
-               //  this is dagroot image
-               ieee154e_setSingleChannel(comandParam_8); // one byte
-#endif
-#ifdef GOLDEN_IMAGE_SNIFFER
-               // this is sniffer image
-               sniffer_setListeningChannel(comandParam_8); // one byte
-#endif
+           // set communication channel for protocol stack
+           ieee154e_setSingleChannel(comandParam_8); // one byte
+           // set listenning channel for sniffer
+           sniffer_setListeningChannel(comandParam_8); // one byte
            break;
        case COMMAND_SET_KAPERIOD: // two bytes, in slots
            sixtop_setKaPeriod(comandParam_16);
@@ -547,7 +521,7 @@ void openserial_goldenImageCommands(void){
                }
            }
            break;
-       case COMMAND_SET_FRAMELENGTH: // two bytes
+       case COMMAND_SET_SLOTFRAMELENGTH: // two bytes
            schedule_setFrameLength(comandParam_16);
            break;
        case COMMAND_SET_ACK_STATUS:
@@ -573,7 +547,7 @@ void openserial_goldenImageCommands(void){
                 break;
             }
              
-            sixtop_setHandler(SIX_HANDLER_OTF);
+            sixtop_setHandler(SIX_HANDLER_SF0);
             if ( 
                 (
                   commandId != COMMAND_SET_6P_ADD &&
@@ -587,11 +561,11 @@ void openserial_goldenImageCommands(void){
                     commandLen == 0
                 ) 
             ){
-                // randommly select cell
+                // randomly select cell
                 sixtop_request(commandId-8,&neighbor,1);
             } else {
                 for (i=0;i<commandLen;i++){
-                    cellList[i].tsNum           = openserial_vars.inputBuf[5+i];
+                    cellList[i].tsNum           = openserial_vars.inputBuf[3+i];
                     cellList[i].choffset        = 0;
                     cellList[i].linkoptions     = CELLTYPE_TX;
                 }
@@ -601,7 +575,7 @@ void openserial_goldenImageCommands(void){
        case COMMAND_SET_SLOTDURATION:
             ieee154e_setSlotDuration(comandParam_16);
             break;
-       case COMMAND_SET_6PRESPONSE_STATUS:
+       case COMMAND_SET_6PRESPONSE:
             if (comandParam_8 ==1) {
                sixtop_setIsResponseEnabled(TRUE);
             } else {
@@ -612,6 +586,9 @@ void openserial_goldenImageCommands(void){
                     break;
                 }
             }
+            break;
+       case COMMAND_SET_UINJECTPERIOD:
+            sf0_appPktPeriod(comandParam_8);
             break;
        default:
            // wrong command ID

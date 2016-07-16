@@ -30,9 +30,11 @@ void uinject_init() {
    // clear local variables
    memset(&uinject_vars,0,sizeof(uinject_vars_t));
    
+   uinject_vars.period = UINJECT_PERIOD_MS;
+   
    // start periodic timer
    uinject_vars.timerId                    = opentimers_start(
-      UINJECT_PERIOD_MS,
+      uinject_vars.period,
       TIMER_PERIODIC,TIME_MS,
       uinject_timer_cb
    );

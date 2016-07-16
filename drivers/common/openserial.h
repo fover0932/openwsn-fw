@@ -52,9 +52,10 @@ enum {
 
 // frames sent PC->mote
 #define SERFRAME_PC2MOTE_SETROOT            ((uint8_t)'R')
+#define SERFRAME_PC2MOTE_RESET              ((uint8_t)'Q')
 #define SERFRAME_PC2MOTE_DATA               ((uint8_t)'D')
 #define SERFRAME_PC2MOTE_TRIGGERSERIALECHO  ((uint8_t)'S')
-#define SERFRAME_PC2MOTE_COMMAND_GD         ((uint8_t)'G')
+#define SERFRAME_PC2MOTE_COMMAND            ((uint8_t)'C')
 
 //=========================== typedef =========================================
 
@@ -66,7 +67,7 @@ enum {
    COMMAND_SET_DAOPERIOD         =  4,
    COMMAND_SET_DAGRANK           =  5,
    COMMAND_SET_SECURITY_STATUS   =  6,
-   COMMAND_SET_FRAMELENGTH       =  7,
+   COMMAND_SET_SLOTFRAMELENGTH   =  7,
    COMMAND_SET_ACK_STATUS        =  8,
    COMMAND_SET_6P_ADD            =  9,
    COMMAND_SET_6P_DELETE         = 10,
@@ -74,8 +75,9 @@ enum {
    COMMAND_SET_6P_LIST           = 12,
    COMMAND_SET_6P_CLEAR          = 13,
    COMMAND_SET_SLOTDURATION      = 14,
-   COMMAND_SET_6PRESPONSE_STATUS = 15,
-   COMMAND_MAX                   = 16,
+   COMMAND_SET_6PRESPONSE        = 15,
+   COMMAND_SET_UINJECTPERIOD     = 16,
+   COMMAND_MAX                   = 17,
 };
 
 //=========================== module variables ================================

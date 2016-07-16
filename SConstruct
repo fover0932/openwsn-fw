@@ -79,8 +79,8 @@ project:
                    (dummy_crypto_engine, firmware_crypto_engine, 
                    board_crypto_engine).
     l2_security   Use hop-by-hop encryption and authentication.
-    goldenImage   sniffer, root or none(default)
-    
+    ide           qtcreator
+
     Common variables:
     verbose        Print each complete compile/link command.
                    0 (off), 1 (on)
@@ -135,7 +135,7 @@ command_line_options = {
     'noadaptivesync':   ['0','1'],
     'cryptoengine':     ['', 'dummy_crypto_engine', 'firmware_crypto_engine', 'board_crypto_engine'],
     'l2_security':      ['0','1'],
-    'goldenImage':      ['none','root','sniffer'],
+    'ide':              ['none','qtcreator']
 }
 
 def validate_option(key, value, env):
@@ -280,19 +280,18 @@ command_line_vars.AddVariables(
         validate_option,                                   # validator
         int,                                               # converter
     ),
-    # create an golden image for interop testing
-    (
-        'goldenImage',                                     # key
-        '',                                                # help
-        command_line_options['goldenImage'][0],            # default
-        validate_option,                                   # validator
-        None,                                              # converter
-    ),
     (
         'apps',                                            # key
         'comma-separated list of user applications',       # help
         '',                                                # default
         validate_apps,                                     # validator
+        None,                                              # converter
+    ),
+    (
+        'ide',                                            # key
+        'qtcreator by now',                               # help
+        command_line_options['ide'][0],                   # default
+        validate_option,                                   # validator
         None,                                              # converter
     ),
 )
