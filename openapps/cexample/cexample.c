@@ -11,7 +11,7 @@
 #include "openserial.h"
 #include "openrandom.h"
 #include "scheduler.h"
-//#include "ADC_Channel.h"
+#include "ADC_Channel.h"
 #include "idmanager.h"
 #include "IEEE802154E.h"
 
